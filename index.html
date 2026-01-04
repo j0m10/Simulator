@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced PLC Builder: Branching Edition</title>
+    <title>Pro PLC Studio: Print & Timers</title>
     <style>
         :root {
             --bg-dark: #1e1e1e;
             --bg-panel: #252526;
             --text-light: #cccccc;
             --accent: #007acc;
-            --highlight: #4caf50; /* Green for Power */
+            --highlight: #4caf50;
             --wire-color: #666;
-            --grid-border: #333;
+            --wire-active: #00ff00;
         }
 
         body {
-            font-family: 'Segoe UI', monospace;
+            font-family: 'Segoe UI', 'Roboto', monospace;
             background-color: var(--bg-dark);
             color: var(--text-light);
             margin: 0;
@@ -26,7 +26,7 @@
             overflow: hidden;
         }
 
-        /* --- TOOLBAR --- */
+        /* --- SCREEN ONLY STYLES --- */
         header {
             background: #2d2d2d;
             padding: 10px 20px;
@@ -34,260 +34,222 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #444;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            flex-shrink: 0;
         }
-        
-        .logo { font-weight: bold; color: #fff; letter-spacing: 1px; }
-        .toolbar { display: flex; gap: 8px; align-items: center; }
 
+        .toolbar-group { display: flex; gap: 8px; align-items: center; }
+        
         button {
-            background: #3c3c3c;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 6px 12px;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            background: #3c3c3c; color: #fff; border: 1px solid #555;
+            padding: 6px 12px; cursor: pointer; border-radius: 3px;
+            font-size: 0.85rem; transition: 0.2s;
         }
         button:hover { background: #505050; }
         button.active-tool { background: var(--accent); border-color: #005f9e; }
-        button.run-mode { background: #2e7d32; border-color: #1b5e20; }
-        button.stop-mode { background: #c62828; border-color: #8e0000; }
+        button.run-btn { background: #2e7d32; }
+        button.print-btn { background: #ff9800; color: #000; font-weight: bold; }
 
-        /* --- MAIN LAYOUT --- */
-        .container { display: flex; flex: 1; height: 100%; }
+        .container { display: flex; flex: 1; height: 100%; overflow: hidden; }
 
-        /* Sidebar */
         .sidebar {
-            width: 220px;
-            background: var(--bg-panel);
-            border-right: 1px solid #444;
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-            gap: 15px;
+            width: 240px; background: var(--bg-panel); border-right: 1px solid #444;
+            display: flex; flex-direction: column; padding: 10px; gap: 10px; overflow-y: auto;
         }
-        
-        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
         .palette-btn {
             background: #333; padding: 10px; text-align: center;
-            border: 1px solid #444; cursor: pointer; border-radius: 4px;
+            border: 1px solid #444; cursor: pointer; border-radius: 3px; font-size: 0.8rem;
         }
         .palette-btn:hover { background: #444; }
         .palette-btn.selected { border-color: var(--accent); background: #2a2d3e; }
 
-        .variable-monitor {
-            flex: 1; border-top: 1px solid #444; padding-top: 10px; overflow-y: auto;
-        }
-        .var-row {
-            display: flex; justify-content: space-between; padding: 4px 8px;
-            font-size: 0.85rem; border-bottom: 1px solid #333;
-        }
-        .var-on { color: var(--highlight); font-weight: bold; }
-
-        /* Workspace */
+        /* --- WORKSPACE (LADDER) --- */
         .workspace {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-            padding: 40px;
-            background-color: #1e1e1e;
+            flex: 1; padding: 40px; overflow: auto; position: relative;
             background-image: radial-gradient(#333 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
-        /* --- LADDER GRID --- */
-        .ladder-wrapper {
-            display: inline-block;
-            position: relative;
-            padding: 0 20px; /* Space for rails */
-        }
+        .ladder-wrapper { display: inline-block; position: relative; padding: 0 15px; min-width: 600px;}
+        
+        .rail { position: absolute; top: 0; bottom: 0; width: 6px; background: #777; z-index: 2; }
+        .rail.left { left: 0; } .rail.right { right: 0; }
 
-        .rail {
-            position: absolute; top: 0; bottom: 0; width: 6px; background: #777;
-            z-index: 10;
-        }
-        .rail.left { left: 0; }
-        .rail.right { right: 0; }
-
-        .rung {
-            display: flex;
-            height: 80px;
-            border-bottom: 1px dashed #333; /* Visual guide only */
+        .rung { display: flex; height: 80px; position: relative; margin-bottom: 5px; }
+        /* Rung Number for Print */
+        .rung-num {
+            position: absolute; left: -30px; top: 30px; font-size: 0.8rem; color: #666; width: 20px; text-align: right;
         }
 
         .cell {
-            width: 90px;
-            height: 100%;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 90px; height: 100%; position: relative;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
         }
-        .cell:hover { background: rgba(255,255,255,0.03); }
+        .cell:hover { background: rgba(255,255,255,0.05); }
 
-        /* The Horizontal Wire */
-        .wire-h {
-            position: absolute;
-            height: 2px;
-            background: var(--wire-color);
-            width: 100%;
-            z-index: 1;
-        }
-
-        /* The Vertical Branch Line (Right side of cell) */
+        /* Wires */
+        .wire-h { position: absolute; height: 2px; background: var(--wire-color); width: 100%; z-index: 1; }
         .wire-v {
-            position: absolute;
-            width: 2px;
-            background: var(--wire-color);
-            right: 0;
-            top: 50%;
-            height: 100%; /* Connects to row below */
-            z-index: 2;
-            display: none; /* Hidden by default */
+            position: absolute; width: 2px; background: var(--wire-color);
+            right: 0; top: 50%; height: 100%; z-index: 1; display: none;
         }
         .has-branch .wire-v { display: block; }
-        
-        /* Power State for Wires */
-        .powered .wire-h, .powered .wire-v, .powered .symbol-draw, .powered.symbol-coil {
-            background-color: var(--highlight) !important;
-            border-color: var(--highlight) !important;
-            box-shadow: 0 0 5px var(--highlight);
-        }
+
+        /* Active State (Screen Only) */
+        .powered .wire-h, .powered .wire-v { background-color: var(--wire-active) !important; box-shadow: 0 0 5px var(--wire-active); }
+        .powered .symbol-draw, .powered.symbol-coil { border-color: var(--wire-active) !important; box-shadow: 0 0 5px var(--wire-active); }
 
         /* --- SYMBOLS --- */
         .symbol {
-            width: 50px; height: 40px; position: relative; z-index: 5;
-            background: var(--bg-dark); /* Mask wire behind it */
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 60px; height: 50px; position: relative; z-index: 5;
+            background: var(--bg-dark); display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        
-        .symbol-draw {
-            width: 100%; height: 100%;
-            border-left: 2px solid var(--wire-color);
-            border-right: 2px solid var(--wire-color);
-            position: relative;
-        }
-        .symbol-nc::after {
-            content: ''; position: absolute; width: 40px; height: 2px; background: var(--wire-color);
-            top: 50%; left: -5px; transform: rotate(-45deg);
-        }
-        .symbol-coil {
-            width: 40px; height: 40px; border: 2px solid var(--wire-color); border-radius: 50%;
-        }
-        .tag-name {
-            position: absolute; top: -18px; font-size: 0.7rem; color: #aaa; white-space: nowrap;
-        }
+        .tag-label { position: absolute; top: -18px; font-size: 0.7rem; color: #aaa; white-space: nowrap; }
 
-        /* Tag Selector Modal */
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center;
+        /* Standard Contacts */
+        .symbol-draw { width: 40px; height: 100%; border-left: 2px solid var(--wire-color); border-right: 2px solid var(--wire-color); position: relative; }
+        .symbol-nc::after { content: ''; position: absolute; width: 46px; height: 2px; background: var(--wire-color); top: 50%; left: -5px; transform: rotate(-45deg); }
+        .symbol-coil { width: 40px; height: 40px; border: 2px solid var(--wire-color); border-radius: 50%; }
+
+        /* Complex Blocks (Timers/Counters) */
+        .block-box {
+            width: 70px; height: 50px; border: 2px solid var(--wire-color); background: var(--bg-dark);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            font-size: 0.65rem; font-family: monospace; z-index: 6;
         }
-        .modal-box {
-            background: #333; padding: 20px; border-radius: 5px; width: 300px; border: 1px solid #555;
+        .block-header { font-weight: bold; margin-bottom: 2px; }
+        .block-val { width: 100%; display: flex; justify-content: space-between; padding: 0 4px; box-sizing: border-box;}
+
+        /* --- MODAL --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+        .modal-content { background-color: #333; padding: 20px; border: 1px solid #555; width: 320px; border-radius: 5px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; font-size: 0.8rem; margin-bottom: 5px; color: #aaa; }
+        input, select { width: 100%; padding: 8px; background: #222; border: 1px solid #444; color: white; box-sizing: border-box; }
+
+        /* --- PRINT MODE CSS (The Magic) --- */
+        @media print {
+            @page { size: landscape; margin: 0.5cm; }
+            body { 
+                background-color: white !important; color: black !important; 
+                height: auto; overflow: visible; -webkit-print-color-adjust: exact; 
+            }
+            .sidebar, header, .modal, button { display: none !important; }
+            .workspace { padding: 0; margin: 0; background: none !important; overflow: visible; }
+            .ladder-wrapper { width: 100%; min-width: 0; }
+            
+            /* High Contrast for Paper */
+            .rail { background: black !important; width: 4px; }
+            .wire-h, .wire-v { background: black !important; height: 2px; width: 2px; }
+            .wire-h { width: 100%; }
+            
+            .symbol { background: white !important; }
+            .block-box { background: white !important; border-color: black !important; color: black !important; }
+            .symbol-draw, .symbol-coil { border-color: black !important; }
+            .symbol-nc::after { background: black !important; }
+            .tag-label { color: black !important; font-weight: bold; top: -15px; }
+            .rung-num { color: black !important; }
+            
+            /* Remove Glow Effects */
+            .powered .wire-h, .powered .wire-v { background-color: black !important; box-shadow: none !important; }
+            .powered .symbol-draw { border-color: black !important; box-shadow: none !important; }
         }
-        select, input { width: 100%; padding: 8px; margin: 10px 0; background: #222; border: 1px solid #444; color: white; }
 
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">PLC STUDIO</div>
-        <div class="toolbar">
-            <span id="statusTxt" style="color: #888; margin-right: 10px;">EDIT MODE</span>
+        <div style="font-weight:bold;">PLC STUDIO <span style="font-weight:normal; font-size:0.8rem; color:#888;">PRO v2.0</span></div>
+        <div class="toolbar-group">
+            <span id="statusTxt" style="font-size:0.8rem; color:#aaa; margin-right:10px;">EDIT MODE</span>
             <button id="btnEdit" class="active-tool" onclick="setMode('edit')">EDIT</button>
-            <button id="btnRun" class="run-mode" onclick="setMode('run')">RUN</button>
-            <div style="width: 1px; height: 20px; background: #555; margin: 0 10px;"></div>
-            <button onclick="addRung()">+ Rung</button>
+            <button id="btnRun" class="run-btn" onclick="setMode('run')">RUN</button>
+            <div style="width:1px; height:20px; background:#555;"></div>
+            <button class="print-btn" onclick="window.print()">PRINT PROJECT</button>
             <button onclick="clearAll()">Clear</button>
         </div>
     </header>
 
     <div class="container">
         <div class="sidebar">
-            <div style="font-size: 0.8rem; color: #888; margin-bottom: 5px;">COMPONENTS</div>
+            <div style="font-size:0.75rem; color:#888;">BIT LOGIC</div>
             <div class="palette-grid">
-                <div class="palette-btn selected" id="tool-XIC" onclick="selectTool('XIC')">
-                    <strong>-| |-</strong><br>NO
-                </div>
-                <div class="palette-btn" id="tool-XIO" onclick="selectTool('XIO')">
-                    <strong>-|/|-</strong><br>NC
-                </div>
-                <div class="palette-btn" id="tool-OTE" onclick="selectTool('OTE')">
-                    <strong>-( )</strong><br>Coil
-                </div>
-                <div class="palette-btn" id="tool-BRANCH" onclick="selectTool('BRANCH')">
-                    <strong>|</strong><br>Branch
-                </div>
-                <div class="palette-btn" id="tool-DELETE" onclick="selectTool('DELETE')" style="grid-column: span 2; color: #ff5555;">
-                    Eraser
-                </div>
+                <div class="palette-btn selected" id="tool-XIC" onclick="selectTool('XIC')"><strong>-| |-</strong><br>XIC</div>
+                <div class="palette-btn" id="tool-XIO" onclick="selectTool('XIO')"><strong>-|/|-</strong><br>XIO</div>
+                <div class="palette-btn" id="tool-OTE" onclick="selectTool('OTE')"><strong>-( )</strong><br>Coil</div>
+                <div class="palette-btn" id="tool-BRANCH" onclick="selectTool('BRANCH')"><strong>|</strong><br>Branch</div>
+                <div class="palette-btn" id="tool-DELETE" onclick="selectTool('DELETE')" style="color:#ff6666;">Delete</div>
             </div>
 
-            <div style="font-size: 0.8rem; color: #888; margin-bottom: 5px; margin-top: 20px;">I/O TABLE</div>
-            <div class="variable-monitor" id="ioTable">
+            <div style="font-size:0.75rem; color:#888; margin-top:10px;">TIMERS / COUNTERS</div>
+            <div class="palette-grid">
+                <div class="palette-btn" id="tool-TON" onclick="selectTool('TON')"><strong>TON</strong><br>Timer</div>
+                <div class="palette-btn" id="tool-CTU" onclick="selectTool('CTU')"><strong>CTU</strong><br>Count Up</div>
+                <div class="palette-btn" id="tool-RES" onclick="selectTool('RES')"><strong>RES</strong><br>Reset</div>
+            </div>
+
+            <div style="font-size:0.75rem; color:#888; margin-top:20px;">LIVE DATA</div>
+            <div id="dataView" style="font-size:0.8rem; font-family:monospace;">
                 </div>
         </div>
 
         <div class="workspace">
             <div class="ladder-wrapper">
                 <div class="rail left"></div>
-                <div id="gridContainer"></div>
+                <div id="rungContainer"></div>
                 <div class="rail right"></div>
             </div>
         </div>
     </div>
 
-    <div class="modal" id="tagModal">
-        <div class="modal-box">
-            <h3>Assign Tag</h3>
-            <label>Choose Memory Tag:</label>
-            <select id="tagSelect">
-                <option value="Start">Start (Input)</option>
-                <option value="Stop">Stop (Input)</option>
-                <option value="AutoSwitch">AutoSwitch (Input)</option>
-                <option value="SensorA">SensorA (Input)</option>
-                <option value="Motor">Motor (Output)</option>
-                <option value="Pump">Pump (Output)</option>
-                <option value="GreenLight">GreenLight (Output)</option>
-                <option value="RedLight">RedLight (Output)</option>
-            </select>
-            <button onclick="applyTag()" class="run-mode">Save</button>
-            <button onclick="closeModal()" style="background:#555;">Cancel</button>
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Configure Instruction</h3>
+            
+            <div class="form-group">
+                <label>Tag Name / Address:</label>
+                <input type="text" id="inputTag" placeholder="e.g. Start, T1, Motor">
+            </div>
+
+            <div class="form-group" id="presetGroup" style="display:none;">
+                <label>Preset Value (ms for Timer):</label>
+                <input type="number" id="inputPreset" value="3000">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button onclick="saveConfig()" class="run-btn">Save</button>
+                <button onclick="closeModal()" style="background:#555;">Cancel</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- 1. STATE MANAGEMENT ---
-        
+        // --- 1. DATA STRUCTURE ---
         const COLS = 8;
-        // Data structure: program[row][col]
-        // Cell = { type: 'EMPTY'|'XIC'|'XIO'|'OTE', tag: null, hasBranch: false, powered: false }
-        let program = [];
+        let program = []; // Array of Rows. Row = Array of Cells.
         
+        // Memory: Can hold Booleans OR Objects for Complex Types
+        // Example: memory['T1'] = { type: 'TON', pre: 5000, acc: 0, dn: false, en: false }
         let memory = {
-            Start: false, Stop: false, AutoSwitch: false, SensorA: false,
-            Motor: false, Pump: false, GreenLight: false, RedLight: false
+            'Start': false, 'Stop': false, 'Motor': false
         };
 
         let appState = {
-            mode: 'edit', // 'edit' | 'run'
+            mode: 'edit',
             tool: 'XIC',
-            target: null, // {r, c} for modal
-            running: false
+            target: null, // {r, c}
+            running: false,
+            lastTime: 0
         };
 
-        // --- 2. CORE FUNCTIONS ---
-
+        // --- 2. INITIALIZATION ---
         function init() {
-            // Start with 4 empty rungs
-            for(let i=0; i<4; i++) addRung(false);
-            renderGrid();
-            renderIO();
+            for(let i=0; i<3; i++) addRung(false);
+            render();
+            updateDataView();
         }
 
         function addRung(shouldRender = true) {
@@ -296,319 +258,282 @@
                 row.push({ type: 'EMPTY', tag: null, hasBranch: false, powered: false });
             }
             program.push(row);
-            if(shouldRender) renderGrid();
+            if(shouldRender) render();
         }
 
         function clearAll() {
-            program = [];
-            addRung();
-            renderGrid();
+            if(confirm("Clear entire project?")) {
+                program = [];
+                addRung();
+                render();
+            }
         }
 
-        // --- 3. UI INTERACTION ---
-
-        function selectTool(toolName) {
-            appState.tool = toolName;
-            // Highlight UI
+        // --- 3. TOOLS & EDITING ---
+        function selectTool(t) {
+            appState.tool = t;
             document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('tool-'+toolName).classList.add('selected');
+            document.getElementById('tool-'+t).classList.add('selected');
         }
 
-        function setMode(mode) {
-            appState.mode = mode;
-            document.getElementById('statusTxt').innerText = mode === 'run' ? "RUNNING (Click Inputs)" : "EDIT MODE";
+        function setMode(m) {
+            appState.mode = m;
+            document.getElementById('statusTxt').innerText = m === 'run' ? "RUNNING" : "EDIT MODE";
+            document.getElementById('btnEdit').classList.toggle('active-tool', m === 'edit');
+            document.getElementById('btnRun').classList.toggle('active-tool', m === 'run');
             
-            document.getElementById('btnEdit').classList.toggle('active-tool', mode === 'edit');
-            document.getElementById('btnRun').classList.toggle('active-tool', mode === 'run');
-
-            if(mode === 'run') {
+            if(m === 'run') {
                 appState.running = true;
-                simulationLoop();
+                appState.lastTime = performance.now();
+                scanLoop();
             } else {
                 appState.running = false;
                 // Reset power visuals
                 program.forEach(r => r.forEach(c => c.powered = false));
-                renderGrid();
+                render();
             }
         }
 
         function handleCellClick(r, c) {
-            // RUN MODE: Toggle Inputs
+            const cell = program[r][c];
+
+            // RUN MODE: Toggle Boolean Inputs
             if(appState.mode === 'run') {
-                const cell = program[r][c];
-                if(cell.tag && (cell.type === 'XIC' || cell.type === 'XIO')) {
-                    // Toggle memory
+                if(cell.tag && typeof memory[cell.tag] === 'boolean' && (cell.type === 'XIC' || cell.type === 'XIO')) {
                     memory[cell.tag] = !memory[cell.tag];
-                    // Render IO will update on next tick
+                    // Note: We do not manually render here, the loop does it
                 }
                 return;
             }
 
             // EDIT MODE
-            const cell = program[r][c];
-            
             if(appState.tool === 'DELETE') {
-                cell.type = 'EMPTY';
-                cell.tag = null;
-                cell.hasBranch = false;
-                renderGrid();
+                cell.type = 'EMPTY'; cell.tag = null; cell.hasBranch = false;
+                render();
                 return;
             }
-
             if(appState.tool === 'BRANCH') {
-                // Toggle vertical branch line
-                // Constraint: Can't branch on last row or last column
-                if(r < program.length - 1 && c < COLS - 1) {
+                if(r < program.length-1 && c < COLS-1) {
                     cell.hasBranch = !cell.hasBranch;
-                    renderGrid();
+                    render();
                 }
                 return;
             }
 
-            // Placing Components
-            if (appState.tool === 'OTE' && c !== COLS - 1) {
-                alert("Coils (OTE) typically go at the end of the rung.");
-                // We allow it but warn, or restrict it:
-                // return; 
-            }
-
-            // Open Tag Modal
+            // CONFIGURATION
             appState.target = {r, c};
-            document.getElementById('tagModal').style.display = 'flex';
+            document.getElementById('inputTag').value = cell.tag || '';
+            
+            // Show/Hide Preset Input based on Tool
+            const needsPreset = (appState.tool === 'TON' || appState.tool === 'CTU');
+            document.getElementById('presetGroup').style.display = needsPreset ? 'block' : 'none';
+            
+            document.getElementById('configModal').style.display = 'flex';
+            document.getElementById('inputTag').focus();
         }
 
-        function applyTag() {
-            const tag = document.getElementById('tagSelect').value;
+        function saveConfig() {
             const {r, c} = appState.target;
-            
-            program[r][c].type = appState.tool;
-            program[r][c].tag = tag;
-            
+            const tag = document.getElementById('inputTag').value.trim();
+            const preset = parseInt(document.getElementById('inputPreset').value);
+
+            if(!tag) { alert("Tag name required"); return; }
+
+            // Initialize Memory for new tags
+            if(appState.tool === 'TON') {
+                // Initialize Timer Object
+                memory[tag] = { type: 'TON', pre: preset, acc: 0, dn: false, en: false };
+            } else if (appState.tool === 'CTU') {
+                // Initialize Counter
+                memory[tag] = { type: 'CTU', pre: preset, acc: 0, dn: false, lastPower: false };
+            } else if (memory[tag] === undefined) {
+                // Default Boolean
+                memory[tag] = false;
+            }
+
+            program[r][c] = {
+                type: appState.tool,
+                tag: tag,
+                hasBranch: program[r][c].hasBranch // Preserve branch
+            };
+
             closeModal();
-            renderGrid();
+            render();
+            updateDataView();
         }
 
         function closeModal() {
-            document.getElementById('tagModal').style.display = 'none';
+            document.getElementById('configModal').style.display = 'none';
         }
 
-        // --- 4. RENDER ENGINE ---
-
-        function renderGrid() {
-            const container = document.getElementById('gridContainer');
+        // --- 4. RENDERER ---
+        function render() {
+            const container = document.getElementById('rungContainer');
             container.innerHTML = '';
 
-            program.forEach((row, rIndex) => {
+            program.forEach((row, r) => {
                 const rungDiv = document.createElement('div');
                 rungDiv.className = 'rung';
 
-                row.forEach((cell, cIndex) => {
+                // Rung Number
+                const num = document.createElement('div');
+                num.className = 'rung-num';
+                num.innerText = r;
+                rungDiv.appendChild(num);
+
+                row.forEach((cell, c) => {
                     const cellDiv = document.createElement('div');
                     cellDiv.className = 'cell ' + (cell.hasBranch ? 'has-branch' : '');
+                    cellDiv.onclick = () => handleCellClick(r, c);
                     if(cell.powered) cellDiv.classList.add('powered');
 
-                    cellDiv.onclick = () => handleCellClick(rIndex, cIndex);
-
-                    // 1. Horizontal Wire
-                    const wireH = document.createElement('div');
-                    wireH.className = 'wire-h';
+                    // Wires
+                    const wireH = document.createElement('div'); wireH.className = 'wire-h';
                     cellDiv.appendChild(wireH);
-
-                    // 2. Vertical Wire (Branch)
-                    const wireV = document.createElement('div');
-                    wireV.className = 'wire-v';
+                    const wireV = document.createElement('div'); wireV.className = 'wire-v';
                     cellDiv.appendChild(wireV);
 
-                    // 3. Component Symbol
+                    // Symbol
                     if(cell.type !== 'EMPTY') {
-                        const symDiv = document.createElement('div');
-                        symDiv.className = 'symbol';
+                        const sym = document.createElement('div');
+                        sym.className = 'symbol';
                         
-                        // Tag Label
-                        const label = document.createElement('div');
-                        label.className = 'tag-name';
-                        label.innerText = cell.tag;
-                        symDiv.appendChild(label);
+                        // Render Logic for different types
+                        if(['TON', 'CTU'].includes(cell.type)) {
+                            // Complex Block
+                            const mem = memory[cell.tag];
+                            sym.classList.add('block'); // Helper for potential styling
+                            // We construct the box
+                            let box = document.createElement('div');
+                            box.className = 'block-box';
+                            // If running and enabled/done, maybe highlight border?
+                            // Actually parent .powered handles border color via CSS
+                            
+                            box.innerHTML = `
+                                <div class="block-header">${cell.type}</div>
+                                <div class="tag-label" style="position:static; margin-bottom:2px;">${cell.tag}</div>
+                                <div class="block-val"><span>PRE:</span><span>${mem ? mem.pre : '?'}</span></div>
+                                <div class="block-val"><span>ACC:</span><span>${mem ? Math.floor(mem.acc) : '0'}</span></div>
+                            `;
+                            sym.appendChild(box);
 
-                        // Draw Graphics
-                        if(cell.type === 'XIC') {
-                            const draw = document.createElement('div');
-                            draw.className = 'symbol-draw';
-                            symDiv.appendChild(draw);
-                        } else if(cell.type === 'XIO') {
-                            const draw = document.createElement('div');
-                            draw.className = 'symbol-draw symbol-nc';
-                            symDiv.appendChild(draw);
-                            if(cell.powered && appState.mode === 'run') {
-                                // For NC, the slash lights up if the BLOCK passes power
-                                // Actually, standard visual is entire symbol lights up
+                        } else if (cell.type === 'RES') {
+                            let box = document.createElement('div');
+                            box.className = 'block-box';
+                            box.innerHTML = `<div class="block-header">RES</div><div style="font-size:0.7rem;">${cell.tag}</div>`;
+                            sym.appendChild(box);
+                        } else {
+                            // Standard Bits
+                            const lbl = document.createElement('div');
+                            lbl.className = 'tag-label';
+                            lbl.innerText = cell.tag;
+                            sym.appendChild(lbl);
+
+                            if(cell.type === 'XIC') {
+                                let d = document.createElement('div'); d.className = 'symbol-draw'; sym.appendChild(d);
+                            } else if(cell.type === 'XIO') {
+                                let d = document.createElement('div'); d.className = 'symbol-draw symbol-nc'; sym.appendChild(d);
+                            } else if(cell.type === 'OTE') {
+                                let d = document.createElement('div'); d.className = 'symbol-coil'; 
+                                if(memory[cell.tag] === true) d.style.background = "rgba(0,255,0,0.3)";
+                                sym.appendChild(d);
                             }
-                        } else if(cell.type === 'OTE') {
-                            const coil = document.createElement('div');
-                            coil.className = 'symbol-coil';
-                            // If coil is ON, fill it
-                            if(memory[cell.tag]) coil.style.background = "rgba(76, 175, 80, 0.5)";
-                            symDiv.appendChild(coil);
                         }
-                        cellDiv.appendChild(symDiv);
+                        cellDiv.appendChild(sym);
                     }
-
                     rungDiv.appendChild(cellDiv);
                 });
                 container.appendChild(rungDiv);
             });
         }
 
-        function renderIO() {
-            const container = document.getElementById('ioTable');
-            container.innerHTML = '';
-            for(let key in memory) {
-                const row = document.createElement('div');
-                row.className = 'var-row';
-                
-                const valSpan = document.createElement('span');
-                valSpan.innerText = memory[key] ? 'ON' : 'OFF';
-                if(memory[key]) valSpan.className = 'var-on';
+        function updateDataView() {
+            const v = document.getElementById('dataView');
+            v.innerHTML = '';
+            for(let k in memory) {
+                let val = memory[k];
+                let display = '';
+                let color = '#888';
 
-                row.innerHTML = `<span>${key}</span>`;
-                row.appendChild(valSpan);
-                container.appendChild(row);
+                if(typeof val === 'boolean') {
+                    display = val ? 'ON' : 'OFF';
+                    color = val ? '#4caf50' : '#888';
+                } else if(val.type === 'TON') {
+                    display = `ACC:${Math.floor(val.acc)} DN:${val.dn}`;
+                    color = '#29b6f6';
+                } else if(val.type === 'CTU') {
+                    display = `ACC:${val.acc} DN:${val.dn}`;
+                    color = '#ab47bc';
+                }
+
+                let row = document.createElement('div');
+                row.style.marginBottom = '4px';
+                row.innerHTML = `<span style="color:#eee;">${k}:</span> <span style="color:${color}">${display}</span>`;
+                v.appendChild(row);
             }
         }
 
-        // --- 5. LOGIC ENGINE (FLOOD FILL GRAPH TRAVERSAL) ---
 
-        function simulationLoop() {
+        // --- 5. LOGIC ENGINE ---
+        function scanLoop() {
             if(!appState.running) return;
 
-            // A. Reset Power State
-            // We use a 2D array of "Nodes". 
-            // Node[r][c] represents the wire on the LEFT side of cell[r][c].
-            // Node[r][COLS] represents the right rail.
-            
-            // Actually, simpler: 
-            // Let's track which CELL is energized.
-            // Power exists at the "Entrance" of a cell (Left side).
-            // Power exists at the "Exit" of a cell (Right side).
-            
-            // Let's use a Set of energized coordinates string "r,c" representing the LEFT side of that cell.
-            let energizedNodes = new Set();
-            
-            // 1. Initial Power: All cells in Column 0 have power at their input.
-            for(let r=0; r<program.length; r++) {
-                energizedNodes.add(`${r},0`);
+            const now = performance.now();
+            const dt = now - appState.lastTime;
+            appState.lastTime = now;
+
+            // A. Reset transient states
+            // Reset "Enable" flag for timers before scan to see if they get power this frame
+            for(let k in memory) {
+                if(memory[k].type === 'TON') memory[k].en = false;
+                if(memory[k].type === 'CTU') memory[k].poweredNow = false;
             }
 
-            // 2. Queue for BFS
-            let queue = [];
-            energizedNodes.forEach(s => queue.push(s));
-            
-            // We also need to track Vertical connectivity.
-            // If Cell[r][c] has a branch, it connects Exit[r][c] with Exit[r+1][c].
-            // Which is equivalent to Input[r][c+1] connecting to Input[r+1][c+1].
+            // B. BFS FLOOD FILL (Power Flow)
+            let energized = new Set();
+            for(let r=0; r<program.length; r++) energized.add(`${r},0`); // Power left rail
 
-            let visited = new Set([...queue]);
+            let queue = [...energized];
+            let visited = new Set(queue);
 
             while(queue.length > 0) {
-                const id = queue.shift();
-                const [r, c] = id.split(',').map(Number);
+                let id = queue.shift();
+                let [r, c] = id.split(',').map(Number);
+                if(c >= COLS) continue;
 
-                if(c >= COLS) continue; // End of rung
+                let cell = program[r][c];
+                let passes = false;
 
-                // Logic: Can power flow THROUGH cell[r][c]?
-                const cell = program[r][c];
-                let passesPower = false;
-
-                if(cell.type === 'EMPTY') passesPower = true;
-                else if(cell.type === 'XIC') passesPower = memory[cell.tag] === true;
-                else if(cell.type === 'XIO') passesPower = memory[cell.tag] === false;
-                else if(cell.type === 'OTE') {
-                    // OTE passes power to the right visually, and updates memory
-                    passesPower = true; 
-                    memory[cell.tag] = true; // Energize Coil
+                // LOGIC EVALUATION
+                if(cell.type === 'EMPTY') passes = true;
+                else if(cell.type === 'BRANCH') passes = true; // Visual placeholder
+                else if(cell.type === 'XIC') {
+                    // Check Boolean OR Timer/Counter .DN bit
+                    let val = memory[cell.tag];
+                    if(typeof val === 'boolean') passes = val;
+                    else if(val && val.dn !== undefined) passes = val.dn;
+                }
+                else if(cell.type === 'XIO') {
+                    let val = memory[cell.tag];
+                    if(typeof val === 'boolean') passes = !val;
+                    else if(val && val.dn !== undefined) passes = !val.dn;
+                }
+                else if(['OTE', 'TON', 'CTU', 'RES'].includes(cell.type)) {
+                    passes = true; // Outputs pass power visually
+                    // Handle Logic Below
                 }
 
-                if(passesPower) {
-                    // Power flows to the node on the right: (r, c+1)
-                    const nextNode = `${r},${c+1}`;
-                    if(!visited.has(nextNode)) {
-                        visited.add(nextNode);
-                        queue.push(nextNode);
-                        energizedNodes.add(nextNode);
-                    }
+                if(passes) {
+                    // Flow Right
+                    let next = `${r},${c+1}`;
+                    if(!visited.has(next)) { visited.add(next); queue.push(next); energized.add(next); }
 
-                    // CHECK VERTICAL SHARING (The Branch)
-                    // If this cell has a branch, it connects the wire AFTER this cell 
-                    // to the wire AFTER the cell below.
-                    // Effectively: Node (r, c+1) <==> Node (r+1, c+1)
-                    
+                    // Flow Down (Branch)
                     if(cell.hasBranch) {
-                        const nodeBelow = `${r+1},${c+1}`;
-                        const nodeAbove = `${r},${c+1}`; // Current output node
-                        
-                        // If we just powered NodeAbove, we must power NodeBelow
-                        if(!visited.has(nodeBelow)) {
-                            visited.add(nodeBelow);
-                            queue.push(nodeBelow);
-                            energizedNodes.add(nodeBelow);
-                        }
+                        let down = `${r+1},${c+1}`;
+                        if(!visited.has(down)) { visited.add(down); queue.push(down); energized.add(down); }
                     }
-
-                    // Crucial: Check if the cell ABOVE had a branch pointing down to us
-                    if(r > 0 && program[r-1][c].hasBranch) {
-                        const nodeAbove = `${r-1},${c+1}`;
-                        // Since we have power here (r, c+1), flow UP too
-                        if(!visited.has(nodeAbove)) {
-                            visited.add(nodeAbove);
-                            queue.push(nodeAbove);
-                            energizedNodes.add(nodeAbove);
-                        }
-                    }
-                }
-            }
-
-            // B. Update Memory for OTEs that did NOT get power
-            program.forEach((row, r) => {
-                row.forEach((cell, c) => {
-                    if(cell.type === 'OTE') {
-                        // Check if input node (r,c) was energized
-                        if(!energizedNodes.has(`${r},${c}`)) {
-                            memory[cell.tag] = false;
-                        }
-                    }
-                });
-            });
-
-            // C. Update Visuals
-            // A cell is visually "Powered" if its Input Node is energized AND it passes logic.
-            // Or if it's a wire that is energized.
-            program.forEach((row, r) => {
-                row.forEach((cell, c) => {
-                    const inputPower = energizedNodes.has(`${r},${c}`);
-                    
-                    // Simple visual logic:
-                    // If input is hot, light up the left half.
-                    // If component conducts, light up the whole thing.
-                    
-                    let conducts = false;
-                    if(cell.type === 'EMPTY') conducts = true;
-                    else if(cell.type === 'XIC' && memory[cell.tag]) conducts = true;
-                    else if(cell.type === 'XIO' && !memory[cell.tag]) conducts = true;
-                    else if(cell.type === 'OTE' && inputPower) conducts = true;
-
-                    cell.powered = (inputPower && conducts);
-                });
-            });
-
-            renderGrid();
-            renderIO();
-
-            requestAnimationFrame(simulationLoop);
-        }
-
-        // Start
-        init();
-
-    </script>
-</body>
-</html>
+                    // Flow Up (Branch from above)
+                    if(r>0 && program[r-1][c].hasBranch) {
+                        let up = `${r-1},${c+1}`;
+                        if(!visited.has(up)) {

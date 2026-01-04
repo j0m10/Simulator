@@ -3,537 +3,391 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro PLC Studio: Print & Timers</title>
+    <title>PLC Simulator - Diagnostic Mode</title>
     <style>
         :root {
-            --bg-dark: #1e1e1e;
-            --bg-panel: #252526;
-            --text-light: #cccccc;
-            --accent: #007acc;
-            --highlight: #4caf50;
-            --wire-color: #666;
-            --wire-active: #00ff00;
+            --bg: #1e1e1e;
+            --panel: #2d2d2d;
+            --text: #e0e0e0;
+            --accent: #2196F3;
+            --green: #4CAF50;
+            --wire: #757575;
+            --active: #00E676;
         }
 
         body {
-            font-family: 'Segoe UI', 'Roboto', monospace;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-            margin: 0;
+            font-family: 'Segoe UI', monospace;
+            background: var(--bg);
+            color: var(--text);
             display: flex;
             flex-direction: column;
             height: 100vh;
+            margin: 0;
             overflow: hidden;
         }
 
-        /* --- SCREEN ONLY STYLES --- */
+        /* TOOLBAR */
         header {
-            background: #2d2d2d;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background: var(--panel);
+            padding: 10px;
             border-bottom: 1px solid #444;
-            flex-shrink: 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
 
-        .toolbar-group { display: flex; gap: 8px; align-items: center; }
-        
         button {
-            background: #3c3c3c; color: #fff; border: 1px solid #555;
-            padding: 6px 12px; cursor: pointer; border-radius: 3px;
-            font-size: 0.85rem; transition: 0.2s;
+            background: #444;
+            color: white;
+            border: 1px solid #555;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
         }
-        button:hover { background: #505050; }
-        button.active-tool { background: var(--accent); border-color: #005f9e; }
-        button.run-btn { background: #2e7d32; }
-        button.print-btn { background: #ff9800; color: #000; font-weight: bold; }
+        button:hover { background: #555; }
+        button.active { background: var(--accent); border-color: var(--accent); }
+        button.run { background: var(--green); border-color: var(--green); }
+        button.stop { background: #f44336; border-color: #d32f2f; }
 
-        .container { display: flex; flex: 1; height: 100%; overflow: hidden; }
-
-        .sidebar {
-            width: 240px; background: var(--bg-panel); border-right: 1px solid #444;
-            display: flex; flex-direction: column; padding: 10px; gap: 10px; overflow-y: auto;
-        }
-
-        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-        .palette-btn {
-            background: #333; padding: 10px; text-align: center;
-            border: 1px solid #444; cursor: pointer; border-radius: 3px; font-size: 0.8rem;
-        }
-        .palette-btn:hover { background: #444; }
-        .palette-btn.selected { border-color: var(--accent); background: #2a2d3e; }
-
-        /* --- WORKSPACE (LADDER) --- */
-        .workspace {
-            flex: 1; padding: 40px; overflow: auto; position: relative;
-            background-image: radial-gradient(#333 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-
-        .ladder-wrapper { display: inline-block; position: relative; padding: 0 15px; min-width: 600px;}
+        /* LAYOUT */
+        .main { display: flex; flex: 1; overflow: hidden; }
         
-        .rail { position: absolute; top: 0; bottom: 0; width: 6px; background: #777; z-index: 2; }
-        .rail.left { left: 0; } .rail.right { right: 0; }
-
-        .rung { display: flex; height: 80px; position: relative; margin-bottom: 5px; }
-        /* Rung Number for Print */
-        .rung-num {
-            position: absolute; left: -30px; top: 30px; font-size: 0.8rem; color: #666; width: 20px; text-align: right;
+        .sidebar {
+            width: 200px;
+            background: #252526;
+            border-right: 1px solid #333;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
+        .tool-btn {
+            padding: 10px;
+            background: #333;
+            border: 1px solid #444;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .tool-btn:hover { background: #444; }
+        .tool-btn.selected { border-color: var(--accent); background: #2b3a42; }
+
+        .workspace {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            position: relative;
+        }
+
+        /* DIAGNOSTIC CONSOLE */
+        #debugConsole {
+            height: 120px;
+            background: #111;
+            border-top: 2px solid #444;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-err { color: #ff5555; }
+        .log-info { color: #88ccff; }
+
+        /* GRID */
+        .rung { display: flex; margin-bottom: 10px; height: 60px; }
         .cell {
-            width: 90px; height: 100%; position: relative;
+            width: 80px; height: 100%;
+            position: relative;
+            border-bottom: 1px dashed #333;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer;
         }
-        .cell:hover { background: rgba(255,255,255,0.05); }
-
-        /* Wires */
-        .wire-h { position: absolute; height: 2px; background: var(--wire-color); width: 100%; z-index: 1; }
-        .wire-v {
-            position: absolute; width: 2px; background: var(--wire-color);
-            right: 0; top: 50%; height: 100%; z-index: 1; display: none;
-        }
-        .has-branch .wire-v { display: block; }
-
-        /* Active State (Screen Only) */
-        .powered .wire-h, .powered .wire-v { background-color: var(--wire-active) !important; box-shadow: 0 0 5px var(--wire-active); }
-        .powered .symbol-draw, .powered.symbol-coil { border-color: var(--wire-active) !important; box-shadow: 0 0 5px var(--wire-active); }
-
-        /* --- SYMBOLS --- */
+        .cell:hover { background: #333; }
+        
+        /* VISUALS */
+        .wire-h { position: absolute; width: 100%; height: 2px; background: var(--wire); top: 50%; z-index: 1; }
         .symbol {
-            width: 60px; height: 50px; position: relative; z-index: 5;
-            background: var(--bg-dark); display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 40px; height: 40px; background: var(--bg); z-index: 2; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        .tag-label { position: absolute; top: -18px; font-size: 0.7rem; color: #aaa; white-space: nowrap; }
+        .tag-lbl { position: absolute; top: -15px; font-size: 0.7rem; color: #888; white-space: nowrap; }
 
-        /* Standard Contacts */
-        .symbol-draw { width: 40px; height: 100%; border-left: 2px solid var(--wire-color); border-right: 2px solid var(--wire-color); position: relative; }
-        .symbol-nc::after { content: ''; position: absolute; width: 46px; height: 2px; background: var(--wire-color); top: 50%; left: -5px; transform: rotate(-45deg); }
-        .symbol-coil { width: 40px; height: 40px; border: 2px solid var(--wire-color); border-radius: 50%; }
+        /* Active States */
+        .powered .wire-h { background: var(--active); box-shadow: 0 0 5px var(--active); }
+        .powered .symbol { border-color: var(--active); }
+        .on-coil { background: rgba(0, 230, 118, 0.3); border-radius: 50%; }
 
-        /* Complex Blocks (Timers/Counters) */
-        .block-box {
-            width: 70px; height: 50px; border: 2px solid var(--wire-color); background: var(--bg-dark);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            font-size: 0.65rem; font-family: monospace; z-index: 6;
+        /* Modal */
+        #modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center;
         }
-        .block-header { font-weight: bold; margin-bottom: 2px; }
-        .block-val { width: 100%; display: flex; justify-content: space-between; padding: 0 4px; box-sizing: border-box;}
-
-        /* --- MODAL --- */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
-        .modal-content { background-color: #333; padding: 20px; border: 1px solid #555; width: 320px; border-radius: 5px; }
-        .form-group { margin-bottom: 10px; }
-        label { display: block; font-size: 0.8rem; margin-bottom: 5px; color: #aaa; }
-        input, select { width: 100%; padding: 8px; background: #222; border: 1px solid #444; color: white; box-sizing: border-box; }
-
-        /* --- PRINT MODE CSS (The Magic) --- */
-        @media print {
-            @page { size: landscape; margin: 0.5cm; }
-            body { 
-                background-color: white !important; color: black !important; 
-                height: auto; overflow: visible; -webkit-print-color-adjust: exact; 
-            }
-            .sidebar, header, .modal, button { display: none !important; }
-            .workspace { padding: 0; margin: 0; background: none !important; overflow: visible; }
-            .ladder-wrapper { width: 100%; min-width: 0; }
-            
-            /* High Contrast for Paper */
-            .rail { background: black !important; width: 4px; }
-            .wire-h, .wire-v { background: black !important; height: 2px; width: 2px; }
-            .wire-h { width: 100%; }
-            
-            .symbol { background: white !important; }
-            .block-box { background: white !important; border-color: black !important; color: black !important; }
-            .symbol-draw, .symbol-coil { border-color: black !important; }
-            .symbol-nc::after { background: black !important; }
-            .tag-label { color: black !important; font-weight: bold; top: -15px; }
-            .rung-num { color: black !important; }
-            
-            /* Remove Glow Effects */
-            .powered .wire-h, .powered .wire-v { background-color: black !important; box-shadow: none !important; }
-            .powered .symbol-draw { border-color: black !important; box-shadow: none !important; }
-        }
+        .modal-box { background: #333; padding: 20px; width: 300px; border-radius: 5px; }
+        input { width: 100%; padding: 8px; margin: 10px 0; background: #222; border: 1px solid #555; color: white; }
 
     </style>
 </head>
 <body>
 
     <header>
-        <div style="font-weight:bold;">PLC STUDIO <span style="font-weight:normal; font-size:0.8rem; color:#888;">PRO v2.0</span></div>
-        <div class="toolbar-group">
-            <span id="statusTxt" style="font-size:0.8rem; color:#aaa; margin-right:10px;">EDIT MODE</span>
-            <button id="btnEdit" class="active-tool" onclick="setMode('edit')">EDIT</button>
-            <button id="btnRun" class="run-btn" onclick="setMode('run')">RUN</button>
-            <div style="width:1px; height:20px; background:#555;"></div>
-            <button class="print-btn" onclick="window.print()">PRINT PROJECT</button>
-            <button onclick="clearAll()">Clear</button>
-        </div>
+        <strong>PLC DIAGNOSTIC</strong>
+        <button id="btnEdit" class="active" onclick="setMode('edit')">EDIT</button>
+        <button id="btnRun" class="run" onclick="setMode('run')">RUN</button>
+        <button onclick="clearProg()">Clear</button>
     </header>
 
-    <div class="container">
+    <div class="main">
         <div class="sidebar">
-            <div style="font-size:0.75rem; color:#888;">BIT LOGIC</div>
-            <div class="palette-grid">
-                <div class="palette-btn selected" id="tool-XIC" onclick="selectTool('XIC')"><strong>-| |-</strong><br>XIC</div>
-                <div class="palette-btn" id="tool-XIO" onclick="selectTool('XIO')"><strong>-|/|-</strong><br>XIO</div>
-                <div class="palette-btn" id="tool-OTE" onclick="selectTool('OTE')"><strong>-( )</strong><br>Coil</div>
-                <div class="palette-btn" id="tool-BRANCH" onclick="selectTool('BRANCH')"><strong>|</strong><br>Branch</div>
-                <div class="palette-btn" id="tool-DELETE" onclick="selectTool('DELETE')" style="color:#ff6666;">Delete</div>
-            </div>
-
-            <div style="font-size:0.75rem; color:#888; margin-top:10px;">TIMERS / COUNTERS</div>
-            <div class="palette-grid">
-                <div class="palette-btn" id="tool-TON" onclick="selectTool('TON')"><strong>TON</strong><br>Timer</div>
-                <div class="palette-btn" id="tool-CTU" onclick="selectTool('CTU')"><strong>CTU</strong><br>Count Up</div>
-                <div class="palette-btn" id="tool-RES" onclick="selectTool('RES')"><strong>RES</strong><br>Reset</div>
-            </div>
-
-            <div style="font-size:0.75rem; color:#888; margin-top:20px;">LIVE DATA</div>
-            <div id="dataView" style="font-size:0.8rem; font-family:monospace;">
-                </div>
+            <div class="tool-btn selected" id="t-XIC" onclick="setTool('XIC')">XIC -| |-</div>
+            <div class="tool-btn" id="t-XIO" onclick="setTool('XIO')">XIO -|/|-</div>
+            <div class="tool-btn" id="t-OTE" onclick="setTool('OTE')">OTE -( )</div>
+            <div class="tool-btn" id="t-DEL" onclick="setTool('DELETE')" style="color:#f55">Delete</div>
+            <hr style="width:100%; border:0; border-top:1px solid #444;">
+            <div style="font-size:0.8rem; color:#aaa;">Data Table:</div>
+            <div id="dataTable" style="font-size:0.75rem;"></div>
         </div>
-
         <div class="workspace">
-            <div class="ladder-wrapper">
-                <div class="rail left"></div>
-                <div id="rungContainer"></div>
-                <div class="rail right"></div>
-            </div>
+            <div id="grid"></div>
         </div>
     </div>
 
-    <div id="configModal" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-top:0;">Configure Instruction</h3>
-            
-            <div class="form-group">
-                <label>Tag Name / Address:</label>
-                <input type="text" id="inputTag" placeholder="e.g. Start, T1, Motor">
-            </div>
+    <div id="debugConsole">
+        <div>> System Ready.</div>
+    </div>
 
-            <div class="form-group" id="presetGroup" style="display:none;">
-                <label>Preset Value (ms for Timer):</label>
-                <input type="number" id="inputPreset" value="3000">
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button onclick="saveConfig()" class="run-btn">Save</button>
-                <button onclick="closeModal()" style="background:#555;">Cancel</button>
-            </div>
+    <div id="modal">
+        <div class="modal-box">
+            <h3>Name Tag</h3>
+            <input type="text" id="tagNameInput" placeholder="e.g. Start">
+            <button onclick="saveTag()">Save</button>
         </div>
     </div>
 
     <script>
-        // --- 1. DATA STRUCTURE ---
-        const COLS = 8;
-        let program = []; // Array of Rows. Row = Array of Cells.
-        
-        // Memory: Can hold Booleans OR Objects for Complex Types
-        // Example: memory['T1'] = { type: 'TON', pre: 5000, acc: 0, dn: false, en: false }
-        let memory = {
-            'Start': false, 'Stop': false, 'Motor': false
+        // --- SAFE MODE LOGGING ---
+        function log(msg, type='info') {
+            const c = document.getElementById('debugConsole');
+            const d = document.createElement('div');
+            d.innerText = `> ${msg}`;
+            if(type==='err') d.className = 'log-err';
+            else d.className = 'log-info';
+            c.appendChild(d);
+            c.scrollTop = c.scrollHeight;
+            console.log(msg);
+        }
+
+        window.onerror = function(msg, url, line) {
+            log(`CRITICAL ERROR: ${msg} (Line ${line})`, 'err');
+            return false;
         };
 
-        let appState = {
-            mode: 'edit',
-            tool: 'XIC',
-            target: null, // {r, c}
-            running: false,
-            lastTime: 0
-        };
+        // --- APP STATE ---
+        const ROWS = 5;
+        const COLS = 6;
+        let program = [];
+        let memory = {};
+        let mode = 'edit';
+        let tool = 'XIC';
+        let running = false;
+        let pendingCell = null;
 
-        // --- 2. INITIALIZATION ---
         function init() {
-            for(let i=0; i<3; i++) addRung(false);
-            render();
-            updateDataView();
-        }
-
-        function addRung(shouldRender = true) {
-            let row = [];
-            for(let c=0; c<COLS; c++) {
-                row.push({ type: 'EMPTY', tag: null, hasBranch: false, powered: false });
-            }
-            program.push(row);
-            if(shouldRender) render();
-        }
-
-        function clearAll() {
-            if(confirm("Clear entire project?")) {
-                program = [];
-                addRung();
+            try {
+                // Initialize empty grid
+                for(let r=0; r<ROWS; r++) {
+                    let row = [];
+                    for(let c=0; c<COLS; c++) {
+                        row.push({ type: 'EMPTY', tag: null, powered: false });
+                    }
+                    program.push(row);
+                }
                 render();
+                log("Grid initialized successfully.");
+            } catch(e) {
+                log("Init failed: " + e.message, 'err');
             }
         }
 
-        // --- 3. TOOLS & EDITING ---
-        function selectTool(t) {
-            appState.tool = t;
-            document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('tool-'+t).classList.add('selected');
+        // --- TOOLS ---
+        function setTool(t) {
+            tool = t;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('t-'+(t==='DELETE'?'DEL':t)).classList.add('selected');
         }
 
         function setMode(m) {
-            appState.mode = m;
-            document.getElementById('statusTxt').innerText = m === 'run' ? "RUNNING" : "EDIT MODE";
-            document.getElementById('btnEdit').classList.toggle('active-tool', m === 'edit');
-            document.getElementById('btnRun').classList.toggle('active-tool', m === 'run');
+            mode = m;
+            document.getElementById('btnEdit').classList.toggle('active', m==='edit');
+            document.getElementById('btnRun').classList.toggle('active', m==='run');
             
             if(m === 'run') {
-                appState.running = true;
-                appState.lastTime = performance.now();
-                scanLoop();
+                running = true;
+                log("Starting Scan Cycle...");
+                scan();
             } else {
-                appState.running = false;
-                // Reset power visuals
+                running = false;
+                log("System Stopped.");
+                // Clear power visuals
                 program.forEach(r => r.forEach(c => c.powered = false));
                 render();
             }
         }
 
-        function handleCellClick(r, c) {
-            const cell = program[r][c];
+        function clearProg() {
+            if(confirm("Clear logic?")) location.reload();
+        }
 
-            // RUN MODE: Toggle Boolean Inputs
-            if(appState.mode === 'run') {
-                if(cell.tag && typeof memory[cell.tag] === 'boolean' && (cell.type === 'XIC' || cell.type === 'XIO')) {
-                    memory[cell.tag] = !memory[cell.tag];
-                    // Note: We do not manually render here, the loop does it
+        // --- INTERACTION ---
+        function cellClick(r, c) {
+            try {
+                if(mode === 'run') {
+                    // Toggle Input
+                    let cell = program[r][c];
+                    if(cell.tag && (cell.type === 'XIC' || cell.type === 'XIO')) {
+                        memory[cell.tag] = !memory[cell.tag];
+                        log(`Toggled ${cell.tag} to ${memory[cell.tag]}`);
+                        // No manual render, loop handles it
+                    }
+                    return;
                 }
-                return;
-            }
 
-            // EDIT MODE
-            if(appState.tool === 'DELETE') {
-                cell.type = 'EMPTY'; cell.tag = null; cell.hasBranch = false;
-                render();
-                return;
-            }
-            if(appState.tool === 'BRANCH') {
-                if(r < program.length-1 && c < COLS-1) {
-                    cell.hasBranch = !cell.hasBranch;
+                // EDIT MODE
+                if(tool === 'DELETE') {
+                    program[r][c] = { type: 'EMPTY', tag: null, powered: false };
                     render();
+                } else {
+                    pendingCell = {r, c};
+                    document.getElementById('tagNameInput').value = '';
+                    document.getElementById('modal').style.display = 'flex';
+                    document.getElementById('tagNameInput').focus();
                 }
-                return;
+            } catch(e) {
+                log("Click error: " + e.message, 'err');
             }
-
-            // CONFIGURATION
-            appState.target = {r, c};
-            document.getElementById('inputTag').value = cell.tag || '';
-            
-            // Show/Hide Preset Input based on Tool
-            const needsPreset = (appState.tool === 'TON' || appState.tool === 'CTU');
-            document.getElementById('presetGroup').style.display = needsPreset ? 'block' : 'none';
-            
-            document.getElementById('configModal').style.display = 'flex';
-            document.getElementById('inputTag').focus();
         }
 
-        function saveConfig() {
-            const {r, c} = appState.target;
-            const tag = document.getElementById('inputTag').value.trim();
-            const preset = parseInt(document.getElementById('inputPreset').value);
-
-            if(!tag) { alert("Tag name required"); return; }
-
-            // Initialize Memory for new tags
-            if(appState.tool === 'TON') {
-                // Initialize Timer Object
-                memory[tag] = { type: 'TON', pre: preset, acc: 0, dn: false, en: false };
-            } else if (appState.tool === 'CTU') {
-                // Initialize Counter
-                memory[tag] = { type: 'CTU', pre: preset, acc: 0, dn: false, lastPower: false };
-            } else if (memory[tag] === undefined) {
-                // Default Boolean
-                memory[tag] = false;
+        function saveTag() {
+            let tag = document.getElementById('tagNameInput').value.trim();
+            // FALLBACK: If user provides no name, generate one
+            if(!tag) {
+                tag = `Tag_${Date.now().toString().substr(-4)}`;
+                log(`No name provided. Auto-generated: ${tag}`);
             }
 
-            program[r][c] = {
-                type: appState.tool,
-                tag: tag,
-                hasBranch: program[r][c].hasBranch // Preserve branch
-            };
+            if(memory[tag] === undefined) memory[tag] = false;
 
-            closeModal();
+            let {r, c} = pendingCell;
+            program[r][c] = { type: tool, tag: tag, powered: false };
+            
+            document.getElementById('modal').style.display = 'none';
             render();
-            updateDataView();
+            updateData();
         }
 
-        function closeModal() {
-            document.getElementById('configModal').style.display = 'none';
-        }
-
-        // --- 4. RENDERER ---
+        // --- RENDERING ---
         function render() {
-            const container = document.getElementById('rungContainer');
-            container.innerHTML = '';
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
 
             program.forEach((row, r) => {
-                const rungDiv = document.createElement('div');
-                rungDiv.className = 'rung';
-
-                // Rung Number
-                const num = document.createElement('div');
-                num.className = 'rung-num';
-                num.innerText = r;
-                rungDiv.appendChild(num);
-
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'rung';
+                
                 row.forEach((cell, c) => {
                     const cellDiv = document.createElement('div');
-                    cellDiv.className = 'cell ' + (cell.hasBranch ? 'has-branch' : '');
-                    cellDiv.onclick = () => handleCellClick(r, c);
+                    cellDiv.className = 'cell';
                     if(cell.powered) cellDiv.classList.add('powered');
+                    cellDiv.onclick = () => cellClick(r, c);
 
-                    // Wires
-                    const wireH = document.createElement('div'); wireH.className = 'wire-h';
-                    cellDiv.appendChild(wireH);
-                    const wireV = document.createElement('div'); wireV.className = 'wire-v';
-                    cellDiv.appendChild(wireV);
+                    // Wire
+                    const wire = document.createElement('div');
+                    wire.className = 'wire-h';
+                    cellDiv.appendChild(wire);
 
-                    // Symbol
+                    // Component
                     if(cell.type !== 'EMPTY') {
                         const sym = document.createElement('div');
                         sym.className = 'symbol';
+                        sym.innerHTML = `<div class="tag-lbl">${cell.tag}</div>`;
                         
-                        // Render Logic for different types
-                        if(['TON', 'CTU'].includes(cell.type)) {
-                            // Complex Block
-                            const mem = memory[cell.tag];
-                            sym.classList.add('block'); // Helper for potential styling
-                            // We construct the box
-                            let box = document.createElement('div');
-                            box.className = 'block-box';
-                            // If running and enabled/done, maybe highlight border?
-                            // Actually parent .powered handles border color via CSS
-                            
-                            box.innerHTML = `
-                                <div class="block-header">${cell.type}</div>
-                                <div class="tag-label" style="position:static; margin-bottom:2px;">${cell.tag}</div>
-                                <div class="block-val"><span>PRE:</span><span>${mem ? mem.pre : '?'}</span></div>
-                                <div class="block-val"><span>ACC:</span><span>${mem ? Math.floor(mem.acc) : '0'}</span></div>
-                            `;
-                            sym.appendChild(box);
-
-                        } else if (cell.type === 'RES') {
-                            let box = document.createElement('div');
-                            box.className = 'block-box';
-                            box.innerHTML = `<div class="block-header">RES</div><div style="font-size:0.7rem;">${cell.tag}</div>`;
-                            sym.appendChild(box);
-                        } else {
-                            // Standard Bits
-                            const lbl = document.createElement('div');
-                            lbl.className = 'tag-label';
-                            lbl.innerText = cell.tag;
-                            sym.appendChild(lbl);
-
-                            if(cell.type === 'XIC') {
-                                let d = document.createElement('div'); d.className = 'symbol-draw'; sym.appendChild(d);
-                            } else if(cell.type === 'XIO') {
-                                let d = document.createElement('div'); d.className = 'symbol-draw symbol-nc'; sym.appendChild(d);
-                            } else if(cell.type === 'OTE') {
-                                let d = document.createElement('div'); d.className = 'symbol-coil'; 
-                                if(memory[cell.tag] === true) d.style.background = "rgba(0,255,0,0.3)";
-                                sym.appendChild(d);
-                            }
+                        // Draw Symbol Text
+                        let icon = '';
+                        if(cell.type === 'XIC') icon = '||';
+                        if(cell.type === 'XIO') icon = '|/|';
+                        if(cell.type === 'OTE') {
+                            icon = '( )';
+                            // Visual feedback for OTE ON
+                            if(memory[cell.tag]) sym.classList.add('on-coil');
                         }
+                        
+                        const txt = document.createElement('div');
+                        txt.style.fontWeight = 'bold';
+                        txt.innerText = icon;
+                        sym.appendChild(txt);
                         cellDiv.appendChild(sym);
                     }
-                    rungDiv.appendChild(cellDiv);
+                    rowDiv.appendChild(cellDiv);
                 });
-                container.appendChild(rungDiv);
+                grid.appendChild(rowDiv);
             });
         }
 
-        function updateDataView() {
-            const v = document.getElementById('dataView');
-            v.innerHTML = '';
+        function updateData() {
+            const dt = document.getElementById('dataTable');
+            dt.innerHTML = '';
             for(let k in memory) {
-                let val = memory[k];
-                let display = '';
-                let color = '#888';
-
-                if(typeof val === 'boolean') {
-                    display = val ? 'ON' : 'OFF';
-                    color = val ? '#4caf50' : '#888';
-                } else if(val.type === 'TON') {
-                    display = `ACC:${Math.floor(val.acc)} DN:${val.dn}`;
-                    color = '#29b6f6';
-                } else if(val.type === 'CTU') {
-                    display = `ACC:${val.acc} DN:${val.dn}`;
-                    color = '#ab47bc';
-                }
-
-                let row = document.createElement('div');
-                row.style.marginBottom = '4px';
-                row.innerHTML = `<span style="color:#eee;">${k}:</span> <span style="color:${color}">${display}</span>`;
-                v.appendChild(row);
+                dt.innerHTML += `<div>${k}: <span style="color:${memory[k]?'#0f0':'#777'}">${memory[k]}</span></div>`;
             }
         }
 
+        // --- LOGIC ENGINE ---
+        function scan() {
+            if(!running) return;
 
-        // --- 5. LOGIC ENGINE ---
-        function scanLoop() {
-            if(!appState.running) return;
+            try {
+                // 1. Calculate Logic
+                // Simple Scan: Row by Row, Left to Right
+                program.forEach((row, r) => {
+                    let hasPower = true; // Left rail always hot
 
-            const now = performance.now();
-            const dt = now - appState.lastTime;
-            appState.lastTime = now;
+                    row.forEach((cell, c) => {
+                        // Visual: Input of this cell is hot?
+                        if(hasPower) cell.powered = true;
+                        else cell.powered = false;
 
-            // A. Reset transient states
-            // Reset "Enable" flag for timers before scan to see if they get power this frame
-            for(let k in memory) {
-                if(memory[k].type === 'TON') memory[k].en = false;
-                if(memory[k].type === 'CTU') memory[k].poweredNow = false;
+                        // Logic: Does this cell pass power to the next?
+                        if(cell.type === 'EMPTY') {
+                            // Wire passes power
+                        }
+                        else if(cell.type === 'XIC') {
+                            if(!memory[cell.tag]) hasPower = false;
+                        }
+                        else if(cell.type === 'XIO') {
+                            if(memory[cell.tag]) hasPower = false;
+                        }
+                        else if(cell.type === 'OTE') {
+                            // Coil is driven by current power
+                            memory[cell.tag] = hasPower;
+                        }
+                    });
+                });
+
+                // 2. Update UI
+                render();
+                updateData();
+
+                // 3. Loop
+                requestAnimationFrame(scan);
+                
+            } catch(e) {
+                running = false;
+                log("CRITICAL SCAN ERROR: " + e.message, 'err');
+                alert("Simulation Crashed. Check console.");
             }
+        }
 
-            // B. BFS FLOOD FILL (Power Flow)
-            let energized = new Set();
-            for(let r=0; r<program.length; r++) energized.add(`${r},0`); // Power left rail
-
-            let queue = [...energized];
-            let visited = new Set(queue);
-
-            while(queue.length > 0) {
-                let id = queue.shift();
-                let [r, c] = id.split(',').map(Number);
-                if(c >= COLS) continue;
-
-                let cell = program[r][c];
-                let passes = false;
-
-                // LOGIC EVALUATION
-                if(cell.type === 'EMPTY') passes = true;
-                else if(cell.type === 'BRANCH') passes = true; // Visual placeholder
-                else if(cell.type === 'XIC') {
-                    // Check Boolean OR Timer/Counter .DN bit
-                    let val = memory[cell.tag];
-                    if(typeof val === 'boolean') passes = val;
-                    else if(val && val.dn !== undefined) passes = val.dn;
-                }
-                else if(cell.type === 'XIO') {
-                    let val = memory[cell.tag];
-                    if(typeof val === 'boolean') passes = !val;
-                    else if(val && val.dn !== undefined) passes = !val.dn;
-                }
-                else if(['OTE', 'TON', 'CTU', 'RES'].includes(cell.type)) {
-                    passes = true; // Outputs pass power visually
-                    // Handle Logic Below
-                }
-
-                if(passes) {
-                    // Flow Right
-                    let next = `${r},${c+1}`;
-                    if(!visited.has(next)) { visited.add(next); queue.push(next); energized.add(next); }
-
-                    // Flow Down (Branch)
-                    if(cell.hasBranch) {
-                        let down = `${r+1},${c+1}`;
-                        if(!visited.has(down)) { visited.add(down); queue.push(down); energized.add(down); }
-                    }
-                    // Flow Up (Branch from above)
-                    if(r>0 && program[r-1][c].hasBranch) {
-                        let up = `${r-1},${c+1}`;
-                        if(!visited.has(up)) {
+        init();
+    </script>
+</body>
+</html>
